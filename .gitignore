@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+*.user
+
+# Rider / VS
+.vs/
+.idea/
+
+# Publish
+publish/
+publish-sf/
+*.zip
+
+# Local artifacts
+*.log

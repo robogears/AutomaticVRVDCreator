@@ -1,0 +1,42 @@
+name: Release
+
+# Pushing a tag like v0.1.1 builds the single-file Windows exe and attaches it to a
+# DRAFT GitHub release. Publishing is a deliberate manual step (see global ship.md).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish single-file self-contained (win-x64)
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          Write-Host "Building version $v from tag ${{ github.ref_name }}"
+          dotnet publish src/AutoVRVD/AutoVRVD.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:Version=$v -o publish
+          # Asset name must contain "win-x64.exe" so the in-app updater matches it.
+          Copy-Item publish/AutoVRVD.exe publish/AutoVRVD-win-x64.exe
+          Get-ChildItem publish/AutoVRVD-win-x64.exe | Select-Object Name, Length
+
+      - name: Create draft GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: publish/AutoVRVD-win-x64.exe
