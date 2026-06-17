@@ -94,6 +94,16 @@ public sealed class VirtualDisplaySession
             else Log.Warn("Deactivate: no in-memory snapshot to restore.");
 
             bool removed = _vda.RemoveDisplay(h.MonitorGuid);
+
+            // The CCD array restore above can fall back to USE_DATABASE_CURRENT (which loses refresh +
+            // primary); explicitly re-apply each physical monitor's exact mode + primary once the
+            // virtual display is gone. This is the fix for "360Hz drops to 120 / secondary becomes main".
+            if (_snapshot is { } snap2)
+            {
+                Thread.Sleep(300); // let the topology settle after the virtual display is removed
+                _dm.RestorePhysicalModes(snap2);
+            }
+
             DisplaySnapshot.DeleteFromDisk();
 
             _handle = null;
@@ -117,6 +127,8 @@ public sealed class VirtualDisplaySession
         Log.Warn($"Recovering from persisted session state (captured {snap.CapturedUtc:o}); removing orphan + restoring.");
         if (_vda.Open()) _vda.RemoveDisplay(snap.VirtualMonitorGuid); // watchdog may already have reaped it
         bool restored = _dm.RestoreWithRetry(snap);
+        Thread.Sleep(300);
+        _dm.RestorePhysicalModes(snap); // faithfully restore refresh/position/primary on crash recovery too
         DisplaySnapshot.DeleteFromDisk();
         Log.Info($"Recovery complete (restored={restored}).");
         return restored;

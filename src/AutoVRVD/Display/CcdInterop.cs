@@ -280,4 +280,41 @@ internal static class CcdInterop
         t.header.id = targetId;
         return DisplayConfigGetDeviceInfo(ref t) == ERROR_SUCCESS ? t.monitorFriendlyDeviceName : null;
     }
+
+    /// <summary>Stable monitor device path + friendly name for a target.</summary>
+    public static (string devicePath, string friendly) GetTargetDeviceName(LUID adapterId, uint targetId)
+    {
+        var t = new DISPLAYCONFIG_TARGET_DEVICE_NAME();
+        t.header.type = (uint)DEVICE_INFO_TYPE.GET_TARGET_NAME;
+        t.header.size = (uint)Marshal.SizeOf<DISPLAYCONFIG_TARGET_DEVICE_NAME>();
+        t.header.adapterId = adapterId;
+        t.header.id = targetId;
+        return DisplayConfigGetDeviceInfo(ref t) == ERROR_SUCCESS
+            ? (t.monitorDevicePath ?? "", t.monitorFriendlyDeviceName ?? "")
+            : ("", "");
+    }
+
+    /// <summary>Map every active source GDI name to its target's (devicePath, friendlyName).</summary>
+    public static Dictionary<string, (string devicePath, string friendly)> MapActiveSourceToTarget()
+    {
+        var map = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase);
+        if (!QueryActive(0, out var paths, out _)) return map;
+        foreach (var p in paths)
+        {
+            string? gdi = GetSourceGdiName(p.sourceInfo.adapterId, p.sourceInfo.id);
+            if (string.IsNullOrEmpty(gdi)) continue;
+            map[gdi] = GetTargetDeviceName(p.targetInfo.adapterId, p.targetInfo.id);
+        }
+        return map;
+    }
+
+    /// <summary>Find the current active source GDI name for a stable monitor device path, or null.</summary>
+    public static string? FindSourceForDevicePath(string devicePath)
+    {
+        if (string.IsNullOrEmpty(devicePath)) return null;
+        foreach (var kv in MapActiveSourceToTarget())
+            if (string.Equals(kv.Value.devicePath, devicePath, StringComparison.OrdinalIgnoreCase))
+                return kv.Key;
+        return null;
+    }
 }

@@ -65,6 +65,11 @@ internal static class Program
             DiagEnforce();
             return;
         }
+        if (args.Length > 0 && args[0].Equals("--diag-restore", StringComparison.OrdinalIgnoreCase))
+        {
+            DiagRestore();
+            return;
+        }
 
         // Single instance.
         _instanceMutex = new Mutex(initiallyOwned: true, @"Local\AutoVRVD_SingleInstance", out bool createdNew);
@@ -278,6 +283,29 @@ internal static class Program
 
         session.Deactivate();
         Log.Info("==== ENFORCE-MODE DIAGNOSTIC DONE ====");
+    }
+
+    /// <summary>Validate restore fidelity: capture, drop a monitor to 60Hz + make it primary, then RestorePhysicalModes back.</summary>
+    private static void DiagRestore()
+    {
+        Log.Init();
+        Log.Info("==== RESTORE-FIDELITY DIAGNOSTIC (perturbs a monitor ~1s, then restores) ====");
+        var dm = new DisplayManager();
+        var snap = dm.Capture(Guid.Empty);
+        if (snap is null || snap.Monitors.Count == 0) { Log.Error("DiagRestore: no physical monitors captured."); return; }
+
+        var target = snap.Monitors.FirstOrDefault(m => !m.IsPrimary) ?? snap.Monitors[0];
+        Log.Info($"DiagRestore: perturbing {target.GdiName} (refresh {target.RefreshHz}->60, making it primary).");
+
+        DisplayManager.SetMode(target.GdiName, target.Width, target.Height, 60); // simulate refresh drop
+        dm.SetPrimaryByGdiName(target.GdiName);                                   // simulate primary change
+        Thread.Sleep(700);
+        Log.Info("DiagRestore: AFTER PERTURB: " + string.Join(" | ", DisplayManager.EnumPhysicalMonitors()));
+
+        dm.RestorePhysicalModes(snap);                                           // the fix under test
+        Thread.Sleep(700);
+        Log.Info("DiagRestore: AFTER RESTORE: " + string.Join(" | ", DisplayManager.EnumPhysicalMonitors()));
+        Log.Info("==== RESTORE-FIDELITY DIAGNOSTIC DONE ====");
     }
 
     /// <summary>Safe, non-disruptive: capture the current topology and re-apply it unchanged.</summary>

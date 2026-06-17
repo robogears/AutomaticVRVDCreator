@@ -1,25 +1,17 @@
-# What's new in v0.1.1
+# What's new in v0.1.2
 
-First public release.
+## Faithful monitor restore (the big fix)
+- Your monitors now return to their **exact** pre-VR state on disconnect — resolution, **refresh rate**, position, and **which one is primary**.
+- Fixes the bug where refresh dropped (e.g. **360 Hz → 120 Hz**) and your **secondary monitor became primary** after exiting VR. Root cause: when other virtual-display drivers (Sunshine, Meta, Virtual Desktop's own) were active, the restore fell back to Windows' last-remembered config and lost your real settings — and it compounded each session.
+- AutoVRVD now snapshots each **physical** monitor's exact mode before switching and re-applies it explicitly on disconnect (and after a crash), independent of any other virtual displays on your system.
 
-## Automatic 4K120 virtual display for Virtual Desktop
-- Detects when you connect to your PC in VR via **Virtual Desktop** and automatically creates a **3840×2160 @ 120 Hz** virtual display (SUDOVDA), makes it primary, and disables your physical monitors.
-- Restores your exact desktop layout the moment you disconnect.
-- **Keeps the resolution locked at 4K120** even if Virtual Desktop tries to drop the display to its lower stream resolution after connecting — no more manually fixing it in Windows settings every time.
-- Crash-safe: a driver watchdog removes the virtual display if the app dies, and your previous layout is restored on the next launch.
-
-## Detection & control
-- Multi-signal Virtual Desktop session detection (streamer process + LAN streaming ports + BodyState event) with a one-time calibration diagnostics tool.
-- Tray app: status icon, manual create/remove, settings (resolution, detection mode, monitor handling), and run-at-login.
-
-## Self-update
-- Checks GitHub for new releases on launch and can download + apply them from the tray menu ("Update available… → Restart to apply").
+> One-time note: if your monitors are currently stuck at 120 Hz / wrong primary from the old bug, set them back to native once in Windows Display Settings — from then on AutoVRVD keeps them there.
 
 ---
 
 # Install
 
-- **Windows (x64)**: download `AutoVRVD-win-x64.exe` and run it. It's self-contained — no .NET install needed. On first launch SmartScreen may warn (the build is unsigned): click **More info → Run anyway**. A tray icon appears.
+- **Windows (x64)**: download `AutoVRVD-win-x64.exe` and run it (self-contained — no .NET install needed). Existing users get this automatically via the tray's update check. On first launch SmartScreen may warn (unsigned): **More info → Run anyway**.
 
 Config and logs live in `%AppData%\AutoVRVD\`.
 
@@ -31,4 +23,4 @@ Config and logs live in `%AppData%\AutoVRVD\`.
 
 ---
 
-**Full Changelog**: https://github.com/robogears/AutomaticVRVDCreator/commits/v0.1.1
+**Full Changelog**: https://github.com/robogears/AutomaticVRVDCreator/compare/v0.1.1...v0.1.2

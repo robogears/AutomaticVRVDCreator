@@ -3,10 +3,29 @@ using System.Text.Json;
 
 namespace AutoVRVD.Display;
 
+/// <summary>Exact per-physical-monitor state, captured so refresh/position/primary restore faithfully.</summary>
+public sealed class MonitorState
+{
+    public string GdiName { get; set; } = "";
+    public string DevicePath { get; set; } = "";   // stable id (CCD monitorDevicePath)
+    public string FriendlyName { get; set; } = "";
+    public uint Width { get; set; }
+    public uint Height { get; set; }
+    public uint RefreshHz { get; set; }
+    public int PosX { get; set; }
+    public int PosY { get; set; }
+    public uint BitsPerPel { get; set; }
+    public bool IsPrimary { get; set; }
+
+    public override string ToString() =>
+        $"{GdiName} {Width}x{Height}@{RefreshHz} @({PosX},{PosY}){(IsPrimary ? " PRIMARY" : "")} [{FriendlyName}]";
+}
+
 /// <summary>
 /// Serializable snapshot of the active display topology. The raw CCD path/mode
 /// arrays are stored as base64 (they're blittable) so they can be re-applied
-/// verbatim for an exact revert, plus identifiers for diagnostics/crash recovery.
+/// verbatim for an exact revert, plus a per-physical-monitor mode list (the
+/// reliable path for restoring refresh/position/primary) and identifiers.
 /// </summary>
 public sealed class DisplaySnapshot
 {
@@ -19,6 +38,9 @@ public sealed class DisplaySnapshot
     public string ModesB64 { get; set; } = "";
     public string? PrimaryGdiName { get; set; }
     public List<string> ActiveGdiNames { get; set; } = new();
+
+    /// <summary>Exact state of each active PHYSICAL monitor (virtual displays excluded).</summary>
+    public List<MonitorState> Monitors { get; set; } = new();
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
