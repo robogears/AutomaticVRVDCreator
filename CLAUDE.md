@@ -307,24 +307,28 @@ this repo implements the .NET equivalents. **Repo:** `robogears/VirtualMirage`
 `robogears`). **Assets:** `VirtualMirage-Setup.exe` (Inno Setup installer — **primary**; the updater matches
 the substring `Setup.exe`, don't break it) + `VirtualMirage-win-x64.exe` (portable single-file, secondary).
 
-**Installer** (`installer/VirtualMirage.iss`, Inno Setup 6): **per-machine** install to `{autopf}\VirtualMirage`
-(`PrivilegesRequired=admin`), Start Menu + optional desktop shortcut, ARP/uninstaller, `CloseApplications`
-to close the running tray app before replacing files. Autostart is a per-user HKCU "Run" value written
-by running `{app}\VirtualMirage.exe --set-autostart` **as the signed-in user** (`runasoriginaluser`, fresh
-install only — `Check: not WizardSilent`), so it lands in the user's hive not the elevated admin's. The
-silent (auto-update) path relaunches de-elevated via a `Check: WizardSilent` `[Run]`. Built locally with
+**Installer** (`installer/VirtualMirage.iss`, Inno Setup 6): **per-USER** install to `{autopf}\VirtualMirage`
+(which, under `PrivilegesRequired=lowest`, resolves to `{userpf}` = `%LocalAppData%\Programs\VirtualMirage`).
+**`lowest` means Setup never elevates → NO UAC prompt** on install or on silent auto-update (this is the
+whole reason the app is per-user; nothing here needs admin). Start Menu + optional desktop shortcut,
+ARP/uninstaller, `CloseApplications` to close the running tray app before replacing files. Setup runs as
+the signed-in user, so autostart (`--set-autostart` → HKCU "Run", fresh interactive install only via
+`Check: not WizardSilent`) and the silent relaunch (`Check: WizardSilent`) need **no `runasoriginaluser`**.
+`[UninstallRun]` runs `--unset-autostart` to clean the Run value on uninstall. Built locally with
 `ISCC.exe /DAppVersion=<v> installer\VirtualMirage.iss` (ISCC at `%LocalAppData%\Programs\Inno Setup 6\`,
 installed user-scope via winget) → `installer-out\VirtualMirage-Setup.exe`. CI builds it on the runner via
-`choco install innosetup`.
+`choco install innosetup`. **Note:** the per-machine builds (≤ v0.1.7) live in `C:\Program Files`; moving
+to a per-user build is a one-time manual cut-over (uninstall the old per-machine entry, run the new
+per-user setup once) — after that, updates are silent forever.
 
 **In-app updater** (`Update/`): `Updater.cs` polls `releases/latest`, compares the assembly version to
 the tag (numeric semver, e.g. `0.1.10 > 0.1.2`), **matches the asset whose name contains `Setup.exe`**
 (case-insensitive) and downloads it — or, if no match / not Windows (`CanSelfInstall()` false),
 **opens the release page in the browser**. Download goes to `%TEMP%\VirtualMirage-update-{ts}.exe`;
-`ApplyUpdate` **runs that installer `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`** (the per-machine setup
-auto-elevates via UAC, `CloseApplications` closes the app, installs to Program Files, relaunches
-de-elevated) and the app calls `Application.Exit()` **only if the launch succeeded** (UAC declined ->
-stays on "Restart to apply"). The download runs on a worker thread (`Task.Run`) so it never freezes the
+`ApplyUpdate` **runs that installer `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`** (the per-user setup
+installs **without elevation — no UAC prompt**, `CloseApplications` closes the app, installs to
+`%LocalAppData%\Programs`, relaunches) and the app calls `Application.Exit()` **only if the launch
+succeeded** (couldn't launch -> stays on "Restart to apply"). The download runs on a worker thread (`Task.Run`) so it never freezes the
 UI, and the progress callback is **state-guarded** (ignores reports once state != Downloading) so a
 trailing `100%` can't overwrite the final state (fixed in v0.1.3). `UpdateController.cs` drives the tray
 menu state machine; launch check is silent (`UpdateCheckOnLaunch`,

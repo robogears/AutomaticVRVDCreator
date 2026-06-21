@@ -1,5 +1,5 @@
-; VirtualMirage installer (Inno Setup 6). Per-machine install to Program Files.
-; Build:  ISCC.exe /DAppVersion=0.1.5 installer\VirtualMirage.iss
+; VirtualMirage installer (Inno Setup 6). Per-USER install to %LocalAppData%\Programs (no admin, no UAC).
+; Build:  ISCC.exe /DAppVersion=0.1.8 installer\VirtualMirage.iss
 ; CI passes the version from the tag; AppVersion defaults to 0.0.0 for local test builds.
 ; Expects the published single-file exe at ..\publish\VirtualMirage.exe.
 
@@ -20,7 +20,9 @@ DefaultDirName={autopf}\VirtualMirage
 DefaultGroupName=VirtualMirage
 DisableProgramGroupPage=yes
 DisableDirPage=auto
-PrivilegesRequired=admin
+; lowest => Setup never elevates, so there is NO UAC prompt on install or on silent auto-update.
+; {autopf} then resolves to {userpf} = %LocalAppData%\Programs, a user-writable location.
+PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\installer-out
@@ -55,15 +57,14 @@ Name: "{group}\VirtualMirage"; Filename: "{app}\VirtualMirage.exe"
 Name: "{autodesktop}\VirtualMirage"; Filename: "{app}\VirtualMirage.exe"; Tasks: desktopicon
 
 [Run]
-; Fresh interactive install only: enable per-user autostart AS THE SIGNED-IN USER (writes HKCU, not the
-; elevated admin hive). Skipped on silent auto-updates so it doesn't override the user's later choice.
-Filename: "{app}\VirtualMirage.exe"; Parameters: "--set-autostart"; Flags: runasoriginaluser runhidden waituntilterminated; Tasks: autostart; Check: not WizardSilent
-; Interactive install: optional "Launch VirtualMirage" checkbox on the Finished page (runs de-elevated).
-Filename: "{app}\VirtualMirage.exe"; Description: "Launch VirtualMirage"; Flags: runasoriginaluser nowait postinstall skipifsilent
-; Silent (auto-update) install: relaunch the tray app as the signed-in user.
-Filename: "{app}\VirtualMirage.exe"; Flags: runasoriginaluser nowait; Check: WizardSilent
+; Setup runs as the signed-in user (no elevation), so HKCU writes and the relaunch land in the right
+; place directly — no runasoriginaluser needed. Fresh interactive install only: enable per-user autostart.
+Filename: "{app}\VirtualMirage.exe"; Parameters: "--set-autostart"; Flags: runhidden waituntilterminated; Tasks: autostart; Check: not WizardSilent
+; Interactive install: optional "Launch VirtualMirage" checkbox on the Finished page.
+Filename: "{app}\VirtualMirage.exe"; Description: "Launch VirtualMirage"; Flags: nowait postinstall skipifsilent
+; Silent (auto-update) install: relaunch the tray app.
+Filename: "{app}\VirtualMirage.exe"; Flags: nowait; Check: WizardSilent
 
-; Note: the autostart entry is a per-user HKCU "Run" value (written by --set-autostart as the signed-in
-; user). The elevated uninstaller can't reach that user's hive, so we don't remove it here; a stale Run
-; value pointing at the removed exe is harmless (Windows skips missing autostart targets). The user can
-; also toggle it any time in the app's Settings ("Start with Windows").
+[UninstallRun]
+; Clean up the per-user autostart value on uninstall (uninstaller runs as the user, so HKCU is reachable).
+Filename: "{app}\VirtualMirage.exe"; Parameters: "--unset-autostart"; Flags: runhidden; RunOnceId: "unsetautostart"

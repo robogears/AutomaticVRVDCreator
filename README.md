@@ -30,11 +30,12 @@ display changes are made in your interactive session.
 ## Install
 
 **Recommended — run the installer:** download **`VirtualMirage-Setup.exe`** from the
-[Releases page](https://github.com/robogears/VirtualMirage/releases) and run it. It installs to
-`C:\Program Files\VirtualMirage`, adds a Start Menu shortcut and an Add/Remove Programs entry, optionally
-starts at sign-in, and launches. (Per-machine install, so it asks for admin once. SmartScreen may warn
-on the unsigned build: **More info → Run anyway**.) Future updates are delivered through the same
-installer automatically — tray → **Update available… → Restart to apply** (one UAC confirm).
+[Releases page](https://github.com/robogears/VirtualMirage/releases) and run it. It installs **per-user**
+to `%LocalAppData%\Programs\VirtualMirage`, adds a Start Menu shortcut and an Add/Remove Programs entry,
+optionally starts at sign-in, and launches. **No admin rights, no UAC prompt** — it never touches a
+system location. (SmartScreen may still warn on the unsigned build: **More info → Run anyway**.) Future
+updates apply **silently in the background** — tray → **Check for updates → Download & install** — with
+no prompts at all.
 
 **Portable alternative:** `VirtualMirage-win-x64.exe` is also attached to each release — a self-contained
 single exe you can run from anywhere (no install, no auto-update).

@@ -144,10 +144,10 @@ public static class Updater
     }
 
     /// <summary>
-    /// Launch the downloaded installer silently to apply the update. The per-machine setup auto-elevates
-    /// (UAC), closes the running app (CloseApplications), installs, and relaunches it de-elevated. The
-    /// caller exits the app on success. Returns false if the installer couldn't be launched (e.g. the
-    /// user declined the UAC prompt) so the caller can leave the "Restart to apply" action available.
+    /// Launch the downloaded installer silently to apply the update. The per-USER setup installs WITHOUT
+    /// elevation (no UAC prompt), closes the running app (CloseApplications), installs to
+    /// %LocalAppData%\Programs, and relaunches it. The caller exits the app on success. Returns false if
+    /// the installer couldn't even be launched, so the caller can leave the "Restart to apply" action up.
     /// </summary>
     public static bool ApplyUpdate(string setupPath)
     {
@@ -158,7 +158,7 @@ public static class Updater
             {
                 FileName = setupPath,
                 Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
-                UseShellExecute = true, // lets the setup's admin manifest raise the UAC prompt
+                UseShellExecute = true, // run the setup exe via the shell (no elevation; per-user install)
             });
             return true;
         }
