@@ -1,10 +1,7 @@
-# What's new in v0.1.5
+# What's new in v0.1.6
 
-## New name: VirtualMirage
-- AutoVRVD is now **VirtualMirage** — same app, better name. Everything is renamed: the app and tray, the installer (**`VirtualMirage-Setup.exe`**), and the project/repo. Your existing settings — including the virtual display's **stable identity** — carry over automatically the first time VirtualMirage runs (it migrates `%AppData%\AutoVRVD` -> `%AppData%\VirtualMirage`).
-
-## Upgrading from AutoVRVD
-- The in-app updater on your old AutoVRVD build will fetch this release and install VirtualMirage. Because it's a renamed product, the old **AutoVRVD** entry stays in Add/Remove Programs — **uninstall it** once VirtualMirage is up. (Or just download `VirtualMirage-Setup.exe` below and run it.)
+## Update checks now show a window
+- Clicking **Check for updates** in the tray used to close the menu and run the check invisibly — you couldn't see "Checking…", the result, or the download progress. Now it opens a small **Updates window** that stays open and shows live status: **Checking → Up to date / Update available → Downloading % → Restart & install**, with a clear action button. No more guessing whether a check actually ran.
 
 ---
 
@@ -12,6 +9,7 @@
 
 - **Recommended — installer:** download **`VirtualMirage-Setup.exe`** and run it. SmartScreen may warn on the unsigned build: **More info -> Run anyway**.
 - **Portable alternative:** **`VirtualMirage-win-x64.exe`** is a self-contained single exe you can run from anywhere (no install, no auto-update).
+- **Updating from v0.1.5:** the in-app updater will fetch this for you — tray -> **Check for updates** -> the new window walks you through it.
 
 Config and logs live in `%AppData%\VirtualMirage\`.
 
@@ -23,4 +21,4 @@ Config and logs live in `%AppData%\VirtualMirage\`.
 
 ---
 
-**Full Changelog**: https://github.com/robogears/VirtualMirage/compare/v0.1.4...v0.1.5
+**Full Changelog**: https://github.com/robogears/VirtualMirage/compare/v0.1.5...v0.1.6
