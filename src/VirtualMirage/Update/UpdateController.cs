@@ -4,9 +4,10 @@ using VirtualMirage.UI;
 namespace VirtualMirage.Update;
 
 /// <summary>
-/// Drives the single tray "update" menu item through the state machine
-/// (idle/check -> available -> downloading% -> ready -> restarting), mirroring
-/// the renderer button state machine from updater.md.
+/// Drives the update flow through a state machine (idle/check -> available -> downloading% ->
+/// ready -> restarting). Status shows in two places: the tray "update" menu item (at-a-glance),
+/// and a persistent <see cref="UpdateForm"/> window the user opens from that item — so a manual
+/// check stays visible instead of vanishing when the tray menu closes.
 /// </summary>
 public sealed class UpdateController
 {
@@ -17,14 +18,15 @@ public sealed class UpdateController
     private St _state = St.Idle;
     private UpdateCheckResult? _available;
     private string? _downloadedPath;
+    private UpdateForm? _form;
 
     public UpdateController(TrayApp tray)
     {
         _tray = tray;
-        _tray.UpdateMenuClicked += () => _ = OnClickAsync();
+        _tray.UpdateMenuClicked += OpenWindow;
     }
 
-    /// <summary>Silent check on launch; only surfaces a notice if an update is available.</summary>
+    /// <summary>Silent check on launch; only surfaces a tray notice if an update is available.</summary>
     public async Task StartLaunchCheckAsync()
     {
         var r = await Updater.CheckAsync();
@@ -43,6 +45,40 @@ public sealed class UpdateController
                 _tray.SetUpdateMenu("Check for updates", true);
             }
         }
+    }
+
+    /// <summary>
+    /// Tray "update" item -> open the persistent Updates window. Tray menu clicks arrive on the UI
+    /// thread, so we create/show the form directly here. When idle, kick off a fresh check; otherwise
+    /// reflect the current state into the window.
+    /// </summary>
+    private void OpenWindow()
+    {
+        try
+        {
+            if (_form is null || _form.IsDisposed)
+            {
+                _form = new UpdateForm();
+                _form.PrimaryActionRequested += () => _ = OnClickAsync();
+            }
+            _form.Show();
+            if (_form.WindowState == FormWindowState.Minimized) _form.WindowState = FormWindowState.Normal;
+            _form.BringToFront();
+            _form.Activate();
+
+            St s;
+            lock (_gate) s = _state;
+            switch (s)
+            {
+                case St.Idle: _ = OnClickAsync(); break; // start a fresh check
+                case St.Checking: _form.ShowChecking(); break;
+                case St.Available: _form.ShowAvailable(_available?.Version ?? "?", Updater.CurrentVersion()); break;
+                case St.Downloading: _form.ShowDownloading(-1); break;
+                case St.Ready: _form.ShowReady(_available?.Version ?? ""); break;
+                case St.Restarting: _form.ShowInstalling(); break;
+            }
+        }
+        catch (Exception ex) { Log.Error("open update window failed", ex); }
     }
 
     private async Task OnClickAsync()
@@ -66,8 +102,10 @@ public sealed class UpdateController
     {
         lock (_gate) _state = St.Checking;
         _tray.SetUpdateMenu("Checking for updates…", false);
+        _form?.ShowChecking();
 
         var r = await Updater.CheckAsync();
+        string current = Updater.CurrentVersion();
         lock (_gate)
         {
             switch (r.Status)
@@ -75,15 +113,18 @@ public sealed class UpdateController
                 case UpdateStatus.Available:
                     _available = r; _state = St.Available;
                     _tray.SetUpdateMenu($"Update available: {r.Version} — Download", true);
+                    _form?.ShowAvailable(r.Version ?? "?", current);
                     break;
                 case UpdateStatus.UpToDate:
                     _state = St.Idle;
                     _tray.SetUpdateMenu("Up to date ✓", true);
+                    _form?.ShowUpToDate(current);
                     RevertIdleLater();
                     break;
                 default:
                     _state = St.Idle;
                     _tray.SetUpdateMenu("Update check failed", true);
+                    _form?.ShowFailed("Couldn't check for updates", r.Message ?? "");
                     RevertIdleLater();
                     break;
             }
@@ -106,16 +147,16 @@ public sealed class UpdateController
 
         lock (_gate) _state = St.Downloading;
         _tray.SetUpdateMenu("Starting download…", false);
+        _form?.ShowDownloading(-1);
 
         var progress = new Progress<(long d, long t)>(p =>
         {
             // Ignore late progress once we've left the Downloading state — otherwise a trailing
             // "100%" callback can overwrite the "Restart to apply" text after the download finished.
             lock (_gate) { if (_state != St.Downloading) return; }
-            string txt = p.t > 0
-                ? $"Downloading {(int)(p.d * 100 / p.t)}%"
-                : $"Downloading {p.d / 1024 / 1024} MB";
-            _tray.SetUpdateMenu(txt, false);
+            int pct = p.t > 0 ? (int)(p.d * 100 / p.t) : -1;
+            _tray.SetUpdateMenu(pct >= 0 ? $"Downloading {pct}%" : $"Downloading {p.d / 1024 / 1024} MB", false);
+            _form?.ShowDownloading(pct);
         });
 
         // Run the download on a worker thread so the 68 MB transfer never freezes the UI thread.
@@ -126,12 +167,14 @@ public sealed class UpdateController
             {
                 _state = St.Available;
                 _tray.SetUpdateMenu("Download failed — retry", true);
+                _form?.ShowFailed("Download failed", "The update download didn't complete. Please try again.");
             }
             else
             {
                 _downloadedPath = path;
                 _state = St.Ready;
                 _tray.SetUpdateMenu("Restart to apply update", true);
+                _form?.ShowReady(r.Version ?? "");
             }
         }
     }
@@ -146,6 +189,7 @@ public sealed class UpdateController
             _state = St.Restarting;
         }
         _tray.SetUpdateMenu("Installing update…", false);
+        _form?.ShowInstalling();
         if (Updater.ApplyUpdate(path))
         {
             Application.Exit(); // the installer closes us, installs, and relaunches
@@ -155,6 +199,7 @@ public sealed class UpdateController
             // Installer didn't launch (UAC declined?) — stay ready so the user can retry.
             lock (_gate) _state = St.Ready;
             _tray.SetUpdateMenu("Restart to apply update", true);
+            _form?.ShowReady(_available?.Version ?? "");
         }
     }
 

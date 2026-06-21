@@ -52,6 +52,7 @@ VirtualMirage.exe --diag-restore          # MILD: perturb a monitor (60Hz + prim
                                      #   snaps refresh+primary back (needs physical monitors active, i.e. NOT in VR)
 VirtualMirage.exe --diagnose [seconds]    # detection calibration capture (needs the user's headset)
 VirtualMirage.exe --selftest-settings     # construct the settings form (catches layout exceptions)
+VirtualMirage.exe --selftest-updateform   # construct the Updates window + drive its states (layout check)
 VirtualMirage.exe --selftest-update       # run an update-check and log the result (no download/apply)
 ```
 
@@ -141,17 +142,23 @@ src/VirtualMirage/
   UI/
     TrayApp.cs               NotifyIcon + context menu; SetStatus/Notify/SetUpdateMenu + events;
                              marshals to UI thread via a hidden control.
-    StatusIcons.cs           AppStatus enum (Idle/Disabled/Connected/Active/Error) + runtime-generated
-                             colored-dot icons (StatusIcons.For).
+    IconArt.cs               Procedurally-drawn VR-headset logo (RenderLogo/RenderStatusIcon/BuildIco/
+                             AppIcon) -> the committed VirtualMirage.ico + the tray/forms icons.
+    StatusIcons.cs           AppStatus enum (Idle/Disabled/Connected/Active/Error) -> the logo badged
+                             with a status-colored dot (StatusIcons.For, via IconArt).
     SettingsForm.cs          Settings dialog over Config (+ Autostart): resolution, refresh, detection
                              mode/debounce, startup, "Check for updates on launch".
+    UpdateForm.cs            Persistent (modeless) "Updates" window opened from the tray update item, so a
+                             manual check stays visible after the menu closes. Show* state methods +
+                             PrimaryActionRequested; driven by UpdateController. --selftest-updateform.
 
   Update/  (in-app self-updater)
-    Updater.cs               GitHub releases/latest poll, numeric-semver compare, asset match on
-                             "win-x64.exe", stream download to %TEMP%, detached .cmd swap-and-relaunch.
-                             Owner/Repo/AssetSubstring are hardcoded consts.
-    UpdateController.cs       Tray-menu state machine (Idle->Checking->Available->Downloading->Ready->
-                             Restarting); StartLaunchCheckAsync(). Private _gate.
+    Updater.cs               GitHub releases/latest poll, numeric-semver compare, asset match on the
+                             "Setup.exe" substring, stream download to %TEMP%, run the installer silently
+                             to apply. Owner/Repo/AssetSubstring are hardcoded consts.
+    UpdateController.cs       State machine (Idle->Checking->Available->Downloading->Ready->Restarting)
+                             rendered to BOTH the tray menu item AND the UpdateForm window (tray item
+                             click opens the window). StartLaunchCheckAsync(). Private _gate.
 ```
 
 Data/runtime files (all under `%AppData%\VirtualMirage\`): `config.json`, `logs\virtualmirage-*.log`,

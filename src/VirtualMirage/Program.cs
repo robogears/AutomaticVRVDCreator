@@ -55,6 +55,22 @@ internal static class Program
             catch (Exception ex) { Log.Error("SettingsForm construction failed", ex); }
             return;
         }
+        if (args.Length > 0 && args[0].Equals("--selftest-updateform", StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Init();
+            try
+            {
+                Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+                Application.EnableVisualStyles();
+                using var f = new UpdateForm();
+                _ = f.Handle; // force control/layout creation
+                f.ShowChecking(); f.ShowAvailable("0.1.6", "0.1.5"); f.ShowDownloading(42);
+                f.ShowReady("0.1.6"); f.ShowFailed("Couldn't check for updates", "test"); f.ShowUpToDate("0.1.5");
+                Log.Info("UpdateForm constructed OK.");
+            }
+            catch (Exception ex) { Log.Error("UpdateForm construction failed", ex); }
+            return;
+        }
         if (args.Length > 0 && args[0].Equals("--selftest-update", StringComparison.OrdinalIgnoreCase))
         {
             Log.Init();
