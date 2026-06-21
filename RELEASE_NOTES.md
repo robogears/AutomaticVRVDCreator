@@ -1,7 +1,7 @@
-# What's new in v0.1.6
+# What's new in v0.1.7
 
-## Update checks now show a window
-- Clicking **Check for updates** in the tray used to close the menu and run the check invisibly — you couldn't see "Checking…", the result, or the download progress. Now it opens a small **Updates window** that stays open and shows live status: **Checking → Up to date / Update available → Downloading % → Restart & install**, with a clear action button. No more guessing whether a check actually ran.
+## Test build
+- This is a **test release** to exercise the in-app updater and the new Updates window — there are **no functional changes** from v0.1.6. If you're on v0.1.6, the tray's **Check for updates** should now show **Update available: 0.1.7**, and **Download & install** will update you (the app will report 0.1.7 afterward).
 
 ---
 
@@ -9,7 +9,6 @@
 
 - **Recommended — installer:** download **`VirtualMirage-Setup.exe`** and run it. SmartScreen may warn on the unsigned build: **More info -> Run anyway**.
 - **Portable alternative:** **`VirtualMirage-win-x64.exe`** is a self-contained single exe you can run from anywhere (no install, no auto-update).
-- **Updating from v0.1.5:** the in-app updater will fetch this for you — tray -> **Check for updates** -> the new window walks you through it.
 
 Config and logs live in `%AppData%\VirtualMirage\`.
 
@@ -21,4 +20,4 @@ Config and logs live in `%AppData%\VirtualMirage\`.
 
 ---
 
-**Full Changelog**: https://github.com/robogears/VirtualMirage/compare/v0.1.5...v0.1.6
+**Full Changelog**: https://github.com/robogears/VirtualMirage/compare/v0.1.6...v0.1.7
