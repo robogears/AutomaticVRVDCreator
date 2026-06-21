@@ -297,21 +297,33 @@ This is the current top open item. Not yet fixed.
 The global specs in `Z:\global .md\` (`ship.md`, `updater.md`) are the authority for the process;
 this repo implements the .NET equivalents. **Repo:** `robogears/AutomaticVRVDCreator`
 (https://github.com/robogears/AutomaticVRVDCreator — **exists, public**, origin set, `gh` authed as
-`robogears`). **Asset:** `AutoVRVD-win-x64.exe` (single-file, self-contained — the substring
-`win-x64.exe` is what the updater matches; don't break it).
+`robogears`). **Assets:** `AutoVRVD-Setup.exe` (Inno Setup installer — **primary**; the updater matches
+the substring `Setup.exe`, don't break it) + `AutoVRVD-win-x64.exe` (portable single-file, secondary).
+
+**Installer** (`installer/AutoVRVD.iss`, Inno Setup 6): **per-machine** install to `{autopf}\AutoVRVD`
+(`PrivilegesRequired=admin`), Start Menu + optional desktop shortcut, ARP/uninstaller, `CloseApplications`
+to close the running tray app before replacing files. Autostart is a per-user HKCU "Run" value written
+by running `{app}\AutoVRVD.exe --set-autostart` **as the signed-in user** (`runasoriginaluser`, fresh
+install only — `Check: not WizardSilent`), so it lands in the user's hive not the elevated admin's. The
+silent (auto-update) path relaunches de-elevated via a `Check: WizardSilent` `[Run]`. Built locally with
+`ISCC.exe /DAppVersion=<v> installer\AutoVRVD.iss` (ISCC at `%LocalAppData%\Programs\Inno Setup 6\`,
+installed user-scope via winget) → `installer-out\AutoVRVD-Setup.exe`. CI builds it on the runner via
+`choco install innosetup`.
 
 **In-app updater** (`Update/`): `Updater.cs` polls `releases/latest`, compares the assembly version to
-the tag (numeric semver, e.g. `0.1.10 > 0.1.2`), **searches assets for a name containing
-`win-x64.exe` (case-insensitive)** and downloads the first match — or, if no match / not Windows
-(`CanSelfInstall()` false), **opens the release page in the browser** instead. Download goes to
-`%TEMP%\AutoVRVD-update-{ts}.exe`; `ApplyUpdate` swaps-and-relaunches via a detached `.cmd` (retries
-`move /Y` for up to 30s, relaunches, self-deletes) and the app calls `Application.Exit()` immediately.
-`UpdateController.cs` drives the tray menu state machine; launch check is silent (`UpdateCheckOnLaunch`,
-default true — only surfaces a balloon if an update is available). The download runs on a worker
-thread (`Task.Run`) and the progress callback is **state-guarded** (ignores reports once state !=
-Downloading) so a trailing `100%` can't overwrite the final `Restart to apply` — without that, v0.1.1/
-v0.1.2 stuck on `Downloading 100%` (fixed in v0.1.3). The `Owner` / `Repo` / `AssetSubstring` constants
-in `Updater.cs` are hardcoded — update them if the repo is renamed or the asset is.
+the tag (numeric semver, e.g. `0.1.10 > 0.1.2`), **matches the asset whose name contains `Setup.exe`**
+(case-insensitive) and downloads it — or, if no match / not Windows (`CanSelfInstall()` false),
+**opens the release page in the browser**. Download goes to `%TEMP%\AutoVRVD-update-{ts}.exe`;
+`ApplyUpdate` **runs that installer `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`** (the per-machine setup
+auto-elevates via UAC, `CloseApplications` closes the app, installs to Program Files, relaunches
+de-elevated) and the app calls `Application.Exit()` **only if the launch succeeded** (UAC declined ->
+stays on "Restart to apply"). The download runs on a worker thread (`Task.Run`) so it never freezes the
+UI, and the progress callback is **state-guarded** (ignores reports once state != Downloading) so a
+trailing `100%` can't overwrite the final state (fixed in v0.1.3). `UpdateController.cs` drives the tray
+menu state machine; launch check is silent (`UpdateCheckOnLaunch`,
+default true — only surfaces a balloon if an update is available). The `Owner` / `Repo` /
+`AssetSubstring` constants in `Updater.cs` are hardcoded — update them if the repo is renamed or the
+asset is.
 
 **Ship process — NEVER auto-ship; only on explicit "ship it / release vX.Y.Z".** Follow `ship.md`:
 1. Bump `<Version>` in `src/AutoVRVD/AutoVRVD.csproj` (patch by default). This is the **current**
@@ -321,8 +333,9 @@ in `Updater.cs` are hardcoded — update them if the repo is renamed or the asse
 2. Overwrite `RELEASE_NOTES.md` entirely with the new version's body — keep the 4-part format
    (What's new / `---` / Install + Requirements / `---` / Full Changelog compare link). No old sections.
 3. `git add` explicitly, commit, `git tag -a vX.Y.Z -m vX.Y.Z`, push main, push the tag.
-4. The tag (matching `v*`) triggers `.github/workflows/release.yml` → builds the single-file exe →
-   copies it to `AutoVRVD-win-x64.exe` → attaches it to a release created with **`draft: true`** via
+4. The tag (matching `v*`) triggers `.github/workflows/release.yml` → builds the single-file exe
+   (`AutoVRVD-win-x64.exe`) → builds the Inno Setup installer (`AutoVRVD-Setup.exe`, via
+   `choco install innosetup` + ISCC) → attaches **both** to a release created with **`draft: true`** via
    `softprops/action-gh-release@v2` (`body_path: RELEASE_NOTES.md`).
 5. Run `.\ship-tail.ps1 vX.Y.Z` — waits for CI, **verifies the release body** (softprops sometimes
    leaves it empty; the script checks body length < 50 chars and, if so, re-applies via
@@ -334,10 +347,17 @@ in `Updater.cs` are hardcoded — update them if the repo is renamed or the asse
 **v0.1.1 is the first release** (commit `289cadf`): pushed, CI green, draft release created with asset
 `AutoVRVD-win-x64.exe` and body from `RELEASE_NOTES.md` — **left as a DRAFT for the user to publish**.
 
-## Status (2026-06-17)
+## Status (2026-06-22)
 
-- **Shipped & published v0.1.1 → v0.1.2 → v0.1.3** on the public repo. **v0.1.3 fixes the in-app
-  updater** (it stuck on "Downloading 100%" — download now on a worker thread + state-guarded progress).
+- **Shipped & published v0.1.1 → v0.1.2 → v0.1.3 → v0.1.4** on the public repo. **v0.1.4 = the
+  installer milestone + a real app icon.** AutoVRVD now ships as `AutoVRVD-Setup.exe` (Inno Setup,
+  per-machine), the in-app updater applies updates by running that setup silently, and the app has a
+  procedurally-drawn VR-headset **logo** (`UI/IconArt.cs` → committed `src/AutoVRVD/AutoVRVD.ico`,
+  wired via `<ApplicationIcon>` + Inno `SetupIconFile`; the tray icon is the logo badged with a
+  status dot). Regenerate the .ico with `AutoVRVD.exe --make-icon <path>` (also emits preview/montage
+  PNGs, which are git-ignored).
+- **v0.1.3 fixes the in-app updater** (it stuck on "Downloading 100%" — download now on a worker
+  thread + state-guarded progress).
   Bootstrap caveat: the broken v0.1.1/v0.1.2 updater can't auto-fetch v0.1.3, so v0.1.3 needs a
   **one-time manual install** (download the asset, run it over the old copy); auto-update works after.
 - **v0.1.2 — faithful monitor restore.** Physical monitors now return to their exact

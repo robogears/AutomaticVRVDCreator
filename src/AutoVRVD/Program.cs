@@ -70,6 +70,42 @@ internal static class Program
             DiagRestore();
             return;
         }
+        // Installer hooks (invoked by setup.exe as the signed-in user to manage per-user autostart).
+        if (args.Length > 0 && args[0].Equals("--set-autostart", StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Init(); Autostart.Set(true); return;
+        }
+        if (args.Length > 0 && args[0].Equals("--unset-autostart", StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Init(); Autostart.Set(false); return;
+        }
+        // Dev tool: (re)generate the multi-size app icon + a 256px preview PNG.
+        if (args.Length > 0 && args[0].Equals("--make-icon", StringComparison.OrdinalIgnoreCase))
+        {
+            string outIco = args.Length > 1 ? args[1] : "AutoVRVD.ico";
+            File.WriteAllBytes(outIco, IconArt.BuildIco(new[] { 16, 24, 32, 48, 64, 128, 256 }));
+            using (var preview = IconArt.RenderLogo(256)) preview.Save(Path.ChangeExtension(outIco, ".preview.png"));
+            // Magnified montage of the actual small renders (nearest-neighbour) to judge legibility.
+            int[] small = { 16, 24, 32, 48 };
+            int pad = 8, scale = 6, w = pad, h = 48 * scale + pad * 2;
+            foreach (var sz in small) w += sz * scale + pad;
+            using (var montage = new System.Drawing.Bitmap(w, h))
+            using (var mg = System.Drawing.Graphics.FromImage(montage))
+            {
+                mg.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+                mg.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+                mg.Clear(System.Drawing.Color.FromArgb(40, 40, 48));
+                int x = pad;
+                foreach (var sz in small)
+                {
+                    using var b = IconArt.RenderLogo(sz);
+                    mg.DrawImage(b, x, pad, sz * scale, sz * scale);
+                    x += sz * scale + pad;
+                }
+                montage.Save(Path.ChangeExtension(outIco, ".montage.png"));
+            }
+            return;
+        }
 
         // Single instance.
         _instanceMutex = new Mutex(initiallyOwned: true, @"Local\AutoVRVD_SingleInstance", out bool createdNew);

@@ -145,9 +145,17 @@ public sealed class UpdateController
             path = _downloadedPath;
             _state = St.Restarting;
         }
-        _tray.SetUpdateMenu("Restarting…", false);
-        Updater.ApplyUpdate(path);
-        Application.Exit();
+        _tray.SetUpdateMenu("Installing update…", false);
+        if (Updater.ApplyUpdate(path))
+        {
+            Application.Exit(); // the installer closes us, installs, and relaunches
+        }
+        else
+        {
+            // Installer didn't launch (UAC declined?) — stay ready so the user can retry.
+            lock (_gate) _state = St.Ready;
+            _tray.SetUpdateMenu("Restart to apply update", true);
+        }
     }
 
     private void RevertIdleLater()

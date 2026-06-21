@@ -23,6 +23,7 @@ public sealed class SettingsForm : Form
     {
         _cfg = cfg;
         Text = "AutoVRVD Settings";
+        Icon = IconArt.AppIcon();
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false; MinimizeBox = false;

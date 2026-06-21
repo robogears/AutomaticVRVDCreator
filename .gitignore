@@ -10,7 +10,12 @@ obj/
 # Publish
 publish/
 publish-sf/
+installer-out/
 *.zip
 
 # Local artifacts
 *.log
+
+# Icon dev-preview artifacts (the committed source asset is AutoVRVD.ico)
+src/AutoVRVD/*.preview.png
+src/AutoVRVD/*.montage.png

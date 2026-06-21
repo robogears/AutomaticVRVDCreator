@@ -27,22 +27,30 @@ display changes are made in your interactive session.
 
 ---
 
-## Quick start
+## Install
 
-**Easiest — download the release:** grab `AutoVRVD-win-x64.exe` from the
-[Releases page](https://github.com/robogears/AutomaticVRVDCreator/releases) and run it (it's
-self-contained — no .NET install needed). On first launch SmartScreen may warn (unsigned build):
-**More info → Run anyway**. A tray icon appears.
+**Recommended — run the installer:** download **`AutoVRVD-Setup.exe`** from the
+[Releases page](https://github.com/robogears/AutomaticVRVDCreator/releases) and run it. It installs to
+`C:\Program Files\AutoVRVD`, adds a Start Menu shortcut and an Add/Remove Programs entry, optionally
+starts at sign-in, and launches. (Per-machine install, so it asks for admin once. SmartScreen may warn
+on the unsigned build: **More info → Run anyway**.) Future updates are delivered through the same
+installer automatically — tray → **Update available… → Restart to apply** (one UAC confirm).
 
-**Or build from source:**
+**Portable alternative:** `AutoVRVD-win-x64.exe` is also attached to each release — a self-contained
+single exe you can run from anywhere (no install, no auto-update).
+
+**Build from source:**
 ```powershell
 .\build.ps1                 # Release build (see "Building" for the SDK)
 .\src\AutoVRVD\bin\Release\net8.0-windows\AutoVRVD.exe
+# or build the installer locally (needs Inno Setup):
+.\build.ps1 -Publish
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=0.0.0 installer\AutoVRVD.iss
 ```
 
-Then **calibrate detection once with your headset** (see below), open **Settings…** from the
-tray to enable **Start with Windows**, and you're done. The app **checks for updates on launch**
-and can download + apply them from the tray ("Update available… → Restart to apply").
+Then **calibrate detection once with your headset** (see below), and you're done. Start-at-sign-in is
+offered by the installer (or toggle it any time in **Settings…**). The app **checks for updates on
+launch** and applies them from the tray.
 
 ---
 

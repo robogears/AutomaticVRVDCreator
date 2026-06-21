@@ -25,8 +25,8 @@ public static class Updater
     public const string Owner = "robogears";
     public const string Repo = "AutomaticVRVDCreator";
 
-    /// <summary>Substring identifying the Windows single-file asset in a release.</summary>
-    public const string AssetSubstring = "win-x64.exe";
+    /// <summary>Substring identifying the installer asset in a release (the setup we run to update).</summary>
+    public const string AssetSubstring = "Setup.exe";
 
     private static readonly HttpClient Http = CreateClient();
 
@@ -144,44 +144,28 @@ public static class Updater
     }
 
     /// <summary>
-    /// Spawn a detached .cmd that waits for this .exe's lock to release, swaps in the new exe,
-    /// relaunches it, and self-deletes. The caller must exit the app right after.
+    /// Launch the downloaded installer silently to apply the update. The per-machine setup auto-elevates
+    /// (UAC), closes the running app (CloseApplications), installs, and relaunches it de-elevated. The
+    /// caller exits the app on success. Returns false if the installer couldn't be launched (e.g. the
+    /// user declined the UAC prompt) so the caller can leave the "Restart to apply" action available.
     /// </summary>
-    public static void ApplyUpdate(string newExePath)
+    public static bool ApplyUpdate(string setupPath)
     {
-        string target = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "AutoVRVD.exe");
-        string script = Path.Combine(Path.GetTempPath(), $"AutoVRVD-apply-{DateTime.Now:yyyyMMddHHmmss}.cmd");
-
-        // move /Y fails while TARGET is locked (app still running); retry ~30s. Always relaunch
-        // TARGET at the end so the user gets the app back even if the swap couldn't complete.
-        string cmd = string.Join("\r\n", new[]
+        try
         {
-            "@echo off",
-            "setlocal",
-            $"set \"TARGET={target}\"",
-            $"set \"NEW={newExePath}\"",
-            "set /a count=0",
-            ":retry",
-            "move /Y \"%NEW%\" \"%TARGET%\" >NUL 2>&1",
-            "if errorlevel 1 (",
-            "    timeout /t 1 /nobreak >NUL",
-            "    set /a count+=1",
-            "    if %count% lss 30 goto retry",
-            ")",
-            "start \"\" \"%TARGET%\"",
-            "del \"%~f0\"",
-            "",
-        });
-
-        File.WriteAllText(script, cmd);
-        Log.Info($"Spawning update relauncher: {script} (target={target}, new={newExePath}).");
-        Process.Start(new ProcessStartInfo
+            Log.Info($"Launching installer to apply update: {setupPath}");
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = setupPath,
+                Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
+                UseShellExecute = true, // lets the setup's admin manifest raise the UAC prompt
+            });
+            return true;
+        }
+        catch (Exception ex)
         {
-            FileName = "cmd.exe",
-            Arguments = $"/C \"{script}\"",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden,
-        });
+            Log.Error("Failed to launch the update installer (UAC declined?).", ex);
+            return false;
+        }
     }
 }

@@ -11,7 +11,7 @@
 
     <AssemblyName>AutoVRVD</AssemblyName>
     <RootNamespace>AutoVRVD</RootNamespace>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <Company>AutoVRVD</Company>
     <Product>AutomaticVRVDCreator</Product>
 
@@ -19,6 +19,7 @@
     <PlatformTarget>x64</PlatformTarget>
 
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>AutoVRVD.ico</ApplicationIcon>
 
     <!-- DPI is configured explicitly in Program.Main (SetHighDpiMode), so the
          WinForms source generator must not also emit it. -->
