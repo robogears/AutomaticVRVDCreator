@@ -99,6 +99,41 @@ public sealed class DisplayManager
 
     public static bool HasSavedLayout(string path) => File.Exists(path);
 
+    /// <summary>
+    /// Re-apply a saved "VR layout" for the just-created virtual display <paramref name="vd"/>. The raw CCD
+    /// arrays can't be replayed verbatim here because the virtual display's adapter/target IDs change every
+    /// session (the snapshot's stale virtual path -> SetDisplayConfig err=87 -> USE_DATABASE_CURRENT, which
+    /// never activates the new virtual). So reconstruct from the snapshot's high-level intent with CURRENT
+    /// IDs: "virtual only" -> make it the sole display; otherwise keep the saved physical monitors on
+    /// alongside the virtual, restore their exact modes, and make the virtual primary. Guarantees the
+    /// virtual actually becomes active. (Cross-adapter CLONE/duplicate is not reproduced here.)
+    /// </summary>
+    public bool ApplyVrLayout(VirtualDisplayHandle vd, string path)
+    {
+        var snap = DisplaySnapshot.LoadFromDisk(path);
+        int physCount = snap?.Monitors?.Count ?? 0;
+        Log.Info($"ApplyVrLayout: reconstructing saved VR layout ({physCount} physical monitor(s) + virtual) with current IDs.");
+
+        bool ok;
+        if (snap is null || physCount == 0)
+        {
+            ok = ApplyExclusive(vd); // "virtual only"
+        }
+        else
+        {
+            ok = ActivateVirtualKeepingOthers(vd);
+            Thread.Sleep(200);
+            RestorePhysicalModes(snap);
+            string? vn = ResolveName(vd);
+            if (!string.IsNullOrEmpty(vn)) SetPrimaryByGdiName(vn); // a VR layout makes the virtual primary
+        }
+
+        string? name = ResolveName(vd);
+        bool active = !string.IsNullOrEmpty(name);
+        Log.Info($"ApplyVrLayout: done (ok={ok}, virtual={(active ? name : "INACTIVE")}). Topology now:\n{GdiInterop.DescribeAll()}");
+        return ok && active;
+    }
+
     // ---- Apply (make the virtual display the show) ----
 
     /// <summary>

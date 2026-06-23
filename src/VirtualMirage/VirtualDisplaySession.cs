@@ -61,25 +61,28 @@ public sealed class VirtualDisplaySession
             snap.SaveToDisk();
 
             // 4) Arrange the desktop. If the user saved a "VR layout" and isn't using disable-others mode,
-            //    replay that exact layout (e.g. virtual display duplicated to one monitor, the rest off);
-            //    otherwise run the standard mode+primary+disable-others apply.
+            //    reconstruct it for the just-created virtual display; otherwise run the standard apply.
             bool useVrLayout = !_cfg.DisableOtherMonitors && DisplayManager.HasSavedLayout(Paths.VrLayoutPath);
             bool applied = useVrLayout
-                ? _dm.ApplyLayoutSnapshot(Paths.VrLayoutPath)
+                ? _dm.ApplyVrLayout(h, Paths.VrLayoutPath)
                 : _dm.Apply(h, _cfg.Display, _cfg.SetPrimary, _cfg.DisableOtherMonitors);
 
-            // Re-resolve the now-active name for status/logging.
+            // Re-resolve the now-active name. If the VR-layout apply somehow left the virtual inactive, fall
+            // back to the standard activation so the virtual display ALWAYS appears.
             string? resolved = CcdInterop.FindGdiNameForTarget(h.AdapterLuid, h.TargetId);
+            if (useVrLayout && string.IsNullOrEmpty(resolved))
+            {
+                Log.Warn("Activate: VR-layout apply left the virtual inactive; falling back to standard activation.");
+                applied = _dm.Apply(h, _cfg.Display, _cfg.SetPrimary, _cfg.DisableOtherMonitors);
+                resolved = CcdInterop.FindGdiNameForTarget(h.AdapterLuid, h.TargetId);
+            }
             var finalHandle = string.IsNullOrEmpty(resolved) ? h : h with { GdiName = resolved! };
 
             _handle = finalHandle;
             _snapshot = snap;
             gdiName = finalHandle.GdiName;
             Log.Info($"Activate: virtual display active at '{finalHandle.GdiName}' (apply ok={applied}, vrLayout={useVrLayout}).");
-
-            // The mode enforcer re-asserts the configured resolution; in saved-VR-layout mode the user's
-            // layout dictates the virtual's mode (e.g. matched to a duplicated monitor), so don't fight it.
-            if (!useVrLayout) StartModeEnforcer(finalHandle);
+            StartModeEnforcer(finalHandle);
             return true;
         }
     }

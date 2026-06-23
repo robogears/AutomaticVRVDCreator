@@ -1,10 +1,7 @@
-# What's new in v0.1.11
+# What's new in v0.1.12
 
-## Save & replay your display layouts (duplicate the virtual display to a monitor)
-- New buttons in **Settings** (shown when *"Disable my physical monitors"* is **off**): **Save current as Non-VR layout** and **Save current as VR layout**. Arrange your desktop exactly how you want it — for example, the virtual display **duplicated onto one monitor** with the rest off — then save it. VirtualMirage reproduces your **VR layout on connect** and restores your **Non-VR layout on disconnect**, automatically. It's fully **opt-in**: if you don't save a VR layout, nothing about today's behavior changes.
-- Why it's done this way: Windows handles the (cross-adapter) duplicate perfectly when you set it up by hand, so VirtualMirage just snapshots that exact arrangement and replays it — no fragile guessing.
-
-> Tip: set the virtual display's **Resolution** to match the monitor you're mirroring onto (e.g. **1920×1080**) so the duplicate is clean.
+## Fix: virtual display not appearing after saving a VR layout
+- In v0.1.11, once you'd saved a VR layout, the virtual display could be **created but left inactive (invisible)** on connect. Cause: it tried to replay the exact saved topology, but the virtual display's internal ID changes every session, so the replay failed and never activated the new display. VirtualMirage now **reconstructs** your saved VR layout against the current display, so the virtual reliably appears (with a fallback to standard activation as a safety net).
 
 ---
 
@@ -24,4 +21,4 @@ Config and logs live in `%AppData%\VirtualMirage\`.
 
 ---
 
-**Full Changelog**: https://github.com/robogears/VirtualMirage/compare/v0.1.10...v0.1.11
+**Full Changelog**: https://github.com/robogears/VirtualMirage/compare/v0.1.11...v0.1.12
