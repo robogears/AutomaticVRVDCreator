@@ -68,6 +68,37 @@ public sealed class DisplayManager
         return list;
     }
 
+    // ---- Saved layout presets (the user's "non-VR" / "VR" desktop arrangements) ----
+
+    /// <summary>Capture the current desktop topology and persist it to <paramref name="path"/> for later replay.</summary>
+    public bool SaveLayoutSnapshot(Guid virtualGuid, string path)
+    {
+        var snap = Capture(virtualGuid);
+        if (snap is null) { Log.Error($"SaveLayoutSnapshot: capture failed; not saving {path}."); return false; }
+        snap.SaveToDisk(path);
+        return true;
+    }
+
+    /// <summary>
+    /// Re-apply a previously-saved layout snapshot: the CCD topology (which encodes which monitors are on,
+    /// their positions, and any clone/duplicate grouping) plus each captured monitor's exact mode/primary.
+    /// Used for the keep-others connect (VR layout) and disconnect (normal layout) paths.
+    /// </summary>
+    public bool ApplyLayoutSnapshot(string path)
+    {
+        var snap = DisplaySnapshot.LoadFromDisk(path);
+        if (snap is null) { Log.Warn($"ApplyLayoutSnapshot: no saved layout at {path}."); return false; }
+
+        Log.Info($"ApplyLayoutSnapshot: re-applying saved layout from {path} ({snap.NumPaths} paths, {snap.Monitors.Count} monitor(s)).");
+        bool ok = RestoreWithRetry(snap, attempts: 3, delayMs: 400);
+        Thread.Sleep(200); // let the topology settle before re-asserting per-monitor modes
+        RestorePhysicalModes(snap);
+        Log.Info($"ApplyLayoutSnapshot: done (ccd ok={ok}). Topology now:\n{GdiInterop.DescribeAll()}");
+        return ok;
+    }
+
+    public static bool HasSavedLayout(string path) => File.Exists(path);
+
     // ---- Apply (make the virtual display the show) ----
 
     /// <summary>

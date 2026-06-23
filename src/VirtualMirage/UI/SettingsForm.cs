@@ -19,16 +19,30 @@ public sealed class SettingsForm : Form
     private readonly CheckBox _startWithWindows = new() { Text = "Start VirtualMirage when I sign in", AutoSize = true };
     private readonly CheckBox _updateOnLaunch = new() { Text = "Check for updates on launch", AutoSize = true };
 
-    public SettingsForm(Config cfg)
+    private readonly Button _saveNonVr = new() { Text = "Save current as Non-VR layout", AutoSize = true, Margin = new Padding(0, 0, 8, 0) };
+    private readonly Button _saveVr = new() { Text = "Save current as VR layout", AutoSize = true };
+    private readonly Label _layoutHint = new()
+    {
+        AutoSize = true,
+        ForeColor = SystemColors.GrayText,
+        Text = "Save your desktop arrangements (e.g. virtual display duplicated to one monitor).\nUsed only when “Disable my physical monitors” above is unchecked.",
+    };
+    private readonly Label _layoutStatus = new() { AutoSize = true, ForeColor = SystemColors.GrayText };
+    private readonly Func<bool>? _saveNonVrLayout;
+    private readonly Func<bool>? _saveVrLayout;
+
+    public SettingsForm(Config cfg, Func<bool>? saveNonVrLayout = null, Func<bool>? saveVrLayout = null)
     {
         _cfg = cfg;
+        _saveNonVrLayout = saveNonVrLayout;
+        _saveVrLayout = saveVrLayout;
         Text = "VirtualMirage Settings";
         Icon = IconArt.AppIcon();
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false; MinimizeBox = false;
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(440, 470);
+        ClientSize = new Size(470, 560);
 
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, AutoSize = true };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
@@ -39,6 +53,12 @@ public sealed class SettingsForm : Form
         AddRow(root, "Refresh (Hz)", _hz);
         AddSpan(root, _setPrimary);
         AddSpan(root, _disableOthers);
+        AddSpan(root, _layoutHint);
+        AddSpan(root, Flow(_saveNonVr, _saveVr));
+        AddSpan(root, _layoutStatus);
+        _saveNonVr.Click += (_, _) => DoSaveLayout(_saveNonVrLayout, "Non-VR");
+        _saveVr.Click += (_, _) => DoSaveLayout(_saveVrLayout, "VR");
+        _disableOthers.CheckedChanged += (_, _) => UpdateLayoutButtons();
 
         AddHeader(root, "Detection");
         _mode.Items.AddRange(new object[] { "auto", "event", "ports" });
@@ -79,6 +99,34 @@ public sealed class SettingsForm : Form
         _skipApollo.Checked = _cfg.SkipIfApolloActive;
         _startWithWindows.Checked = Autostart.IsEnabled();
         _updateOnLaunch.Checked = _cfg.UpdateCheckOnLaunch;
+        RefreshLayoutStatus();
+        UpdateLayoutButtons();
+    }
+
+    private void DoSaveLayout(Func<bool>? save, string which)
+    {
+        if (save is null) return;
+        bool ok = false;
+        try { ok = save(); } catch (Exception ex) { Log.Error($"Save {which} layout failed", ex); }
+        MessageBox.Show(this,
+            ok ? $"Saved your current display arrangement as the {which} layout."
+               : "Couldn't capture the current display layout — see the log.",
+            "VirtualMirage", MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        RefreshLayoutStatus();
+    }
+
+    private void RefreshLayoutStatus()
+    {
+        string nv = File.Exists(Paths.NonVrLayoutPath) ? "saved ✓" : "not saved";
+        string vr = File.Exists(Paths.VrLayoutPath) ? "saved ✓" : "not saved";
+        _layoutStatus.Text = $"Non-VR layout: {nv}    •    VR layout: {vr}";
+    }
+
+    private void UpdateLayoutButtons()
+    {
+        bool enabled = !_disableOthers.Checked;
+        _saveNonVr.Enabled = enabled && _saveNonVrLayout != null;
+        _saveVr.Enabled = enabled && _saveVrLayout != null;
     }
 
     private void Persist()

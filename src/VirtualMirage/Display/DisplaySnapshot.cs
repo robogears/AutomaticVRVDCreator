@@ -66,26 +66,30 @@ public sealed class DisplaySnapshot
     internal CcdInterop.DISPLAYCONFIG_MODE_INFO[] GetModes()
         => MemoryMarshal.Cast<byte, CcdInterop.DISPLAYCONFIG_MODE_INFO>(Convert.FromBase64String(ModesB64).AsSpan()).ToArray();
 
-    public void SaveToDisk()
+    public void SaveToDisk() => SaveToDisk(VirtualMirage.Paths.StatePath);
+
+    public void SaveToDisk(string path)
     {
         try
         {
             VirtualMirage.Paths.EnsureCreated();
-            File.WriteAllText(VirtualMirage.Paths.StatePath, JsonSerializer.Serialize(this, JsonOpts));
-            Log.Info($"Persisted session state ({NumPaths} paths) to {VirtualMirage.Paths.StatePath}.");
+            File.WriteAllText(path, JsonSerializer.Serialize(this, JsonOpts));
+            Log.Info($"Persisted snapshot ({NumPaths} paths, {Monitors.Count} monitor(s)) to {path}.");
         }
-        catch (Exception ex) { Log.Error("Failed to persist display snapshot", ex); }
+        catch (Exception ex) { Log.Error($"Failed to persist display snapshot to {path}", ex); }
     }
 
-    public static DisplaySnapshot? LoadFromDisk()
+    public static DisplaySnapshot? LoadFromDisk() => LoadFromDisk(VirtualMirage.Paths.StatePath);
+
+    public static DisplaySnapshot? LoadFromDisk(string path)
     {
         try
         {
-            return File.Exists(VirtualMirage.Paths.StatePath)
-                ? JsonSerializer.Deserialize<DisplaySnapshot>(File.ReadAllText(VirtualMirage.Paths.StatePath))
+            return File.Exists(path)
+                ? JsonSerializer.Deserialize<DisplaySnapshot>(File.ReadAllText(path))
                 : null;
         }
-        catch (Exception ex) { Log.Error("Failed to load display snapshot", ex); return null; }
+        catch (Exception ex) { Log.Error($"Failed to load display snapshot from {path}", ex); return null; }
     }
 
     public static void DeleteFromDisk()

@@ -60,8 +60,13 @@ public sealed class VirtualDisplaySession
             // 3) Persist crash-recovery state (snapshot + the guid to remove) before we change topology.
             snap.SaveToDisk();
 
-            // 4) Apply mode + primary + disable-others (this also activates the display if it was inactive).
-            bool applied = _dm.Apply(h, _cfg.Display, _cfg.SetPrimary, _cfg.DisableOtherMonitors);
+            // 4) Arrange the desktop. If the user saved a "VR layout" and isn't using disable-others mode,
+            //    replay that exact layout (e.g. virtual display duplicated to one monitor, the rest off);
+            //    otherwise run the standard mode+primary+disable-others apply.
+            bool useVrLayout = !_cfg.DisableOtherMonitors && DisplayManager.HasSavedLayout(Paths.VrLayoutPath);
+            bool applied = useVrLayout
+                ? _dm.ApplyLayoutSnapshot(Paths.VrLayoutPath)
+                : _dm.Apply(h, _cfg.Display, _cfg.SetPrimary, _cfg.DisableOtherMonitors);
 
             // Re-resolve the now-active name for status/logging.
             string? resolved = CcdInterop.FindGdiNameForTarget(h.AdapterLuid, h.TargetId);
@@ -70,8 +75,11 @@ public sealed class VirtualDisplaySession
             _handle = finalHandle;
             _snapshot = snap;
             gdiName = finalHandle.GdiName;
-            Log.Info($"Activate: virtual display active at '{finalHandle.GdiName}' (apply ok={applied}).");
-            StartModeEnforcer(finalHandle);
+            Log.Info($"Activate: virtual display active at '{finalHandle.GdiName}' (apply ok={applied}, vrLayout={useVrLayout}).");
+
+            // The mode enforcer re-asserts the configured resolution; in saved-VR-layout mode the user's
+            // layout dictates the virtual's mode (e.g. matched to a duplicated monitor), so don't fight it.
+            if (!useVrLayout) StartModeEnforcer(finalHandle);
             return true;
         }
     }
@@ -87,18 +95,25 @@ public sealed class VirtualDisplaySession
                 return RecoverFromDiskUnlocked();
             }
 
-            // Restore the physical topology FIRST (so there's always an active display),
-            // THEN remove the virtual device.
-            bool restored = true;
-            if (_snapshot is { } snap) restored = _dm.RestoreWithRetry(snap);
-            else Log.Warn("Deactivate: no in-memory snapshot to restore.");
+            // Restore the physical topology FIRST (so there's always an active display), THEN remove the
+            // virtual device. If the user saved a "normal" (non-VR) layout and isn't using disable-others
+            // mode, replay that exact layout; otherwise restore the topology auto-captured at Activate.
+            bool useNonVrLayout = !_cfg.DisableOtherMonitors && DisplayManager.HasSavedLayout(Paths.NonVrLayoutPath);
+            bool restored;
+            if (useNonVrLayout)
+            {
+                Log.Info("Deactivate: applying the saved normal (non-VR) layout.");
+                restored = _dm.ApplyLayoutSnapshot(Paths.NonVrLayoutPath); // also re-asserts per-monitor modes
+            }
+            else if (_snapshot is { } snap) restored = _dm.RestoreWithRetry(snap);
+            else { Log.Warn("Deactivate: no in-memory snapshot to restore."); restored = true; }
 
             bool removed = _vda.RemoveDisplay(h.MonitorGuid);
 
-            // The CCD array restore above can fall back to USE_DATABASE_CURRENT (which loses refresh +
-            // primary); explicitly re-apply each physical monitor's exact mode + primary once the
-            // virtual display is gone. This is the fix for "360Hz drops to 120 / secondary becomes main".
-            if (_snapshot is { } snap2)
+            // For the auto-captured restore path, the CCD array restore can fall back to USE_DATABASE_CURRENT
+            // (which loses refresh + primary); explicitly re-apply each physical monitor's exact mode + primary
+            // once the virtual display is gone. (ApplyLayoutSnapshot already does this for the non-VR path.)
+            if (!useNonVrLayout && _snapshot is { } snap2)
             {
                 Thread.Sleep(300); // let the topology settle after the virtual display is removed
                 _dm.RestorePhysicalModes(snap2);
@@ -108,7 +123,7 @@ public sealed class VirtualDisplaySession
 
             _handle = null;
             _snapshot = null;
-            Log.Info($"Deactivate: restored={restored}, removed={removed}.");
+            Log.Info($"Deactivate: restored={restored}, removed={removed} (nonVrLayout={useNonVrLayout}).");
             return restored && removed;
         }
     }

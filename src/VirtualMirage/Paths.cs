@@ -12,6 +12,12 @@ public static class Paths
     /// <summary>Crash-recovery snapshot written while a session is active.</summary>
     public static string StatePath { get; } = Path.Combine(AppDir, "session.state.json");
 
+    /// <summary>User-saved "normal" desktop layout, re-applied on disconnect (keep-others mode).</summary>
+    public static string NonVrLayoutPath { get; } = Path.Combine(AppDir, "layout.nonvr.json");
+
+    /// <summary>User-saved "VR" layout (e.g. virtual display duplicated to one monitor), re-applied on connect.</summary>
+    public static string VrLayoutPath { get; } = Path.Combine(AppDir, "layout.vr.json");
+
     public static void EnsureCreated()
     {
         Directory.CreateDirectory(AppDir);

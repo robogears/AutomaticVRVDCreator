@@ -86,7 +86,8 @@ src/VirtualMirage/
   Config.cs                  Config/ResolutionConfig/DetectionConfig; JSON at %AppData%\VirtualMirage\config.json.
                              EnsureDefaults() mints a stable MonitorGuid on first run. UpdateCheckOnLaunch
                              (bool, default true).
-  Paths.cs                   %AppData%\VirtualMirage paths (AppDir, LogsDir, ConfigPath, StatePath).
+  Paths.cs                   %AppData%\VirtualMirage paths (AppDir, LogsDir, ConfigPath, StatePath,
+                             NonVrLayoutPath/VrLayoutPath = user-saved layout presets). MigrateLegacyDataIfNeeded.
   Logging.cs                 `Log` static (file + in-memory ring; daily rotation). No NuGet.
   Autostart.cs               HKCU\...\Run toggle (no admin): IsEnabled()/Set(enabled).
   Orchestrator.cs            State machine: detector events -> session Activate/Deactivate, gated by
@@ -95,6 +96,11 @@ src/VirtualMirage/
   VirtualDisplaySession.cs   The worker: Activate (Capture -> CreateDisplay -> persist state -> Apply ->
                              StartModeEnforcer), Deactivate (StopModeEnforcer -> Restore -> RemoveDisplay
                              -> delete state), RecoverIfNeeded. Hosts the per-session mode enforcer.
+                             SAVED-LAYOUT MODE: when DisableOtherMonitors is OFF and a VR/Non-VR layout
+                             preset is saved, Activate replays VrLayoutPath (instead of Apply; enforcer
+                             skipped so it won't fight the layout's resolution) and Deactivate replays
+                             NonVrLayoutPath. Lets the user set up e.g. a duplicate of the virtual onto one
+                             monitor by hand (Windows does the cross-adapter clone) and have it reproduced.
 
   Interop/Native.cs          LUID (LowPart/HighPart, ToInt64/FromInt64/SameAs), POINTL, RECT,
                              CreateFileW, DeviceIoControl.
@@ -125,10 +131,12 @@ src/VirtualMirage/
                              + SetPrimaryByGdiName; legacy fallback), EnforceMode
                              (SetMode then SetModeViaCcd), RestorePhysicalModes (legacy per-monitor mode +
                              SetPrimaryByGdiName via fresh CCD query), ResolveName, RestoreWithRetry ->
-                             Restore (3 fallback levels), SetMode/SetPrimary/DisableAllExcept (legacy statics).
+                             Restore (3 fallback levels), SetMode/SetPrimary/DisableAllExcept (legacy statics),
+                             SaveLayoutSnapshot/ApplyLayoutSnapshot (user-saved layout presets, see below).
     DisplaySnapshot.cs       Serializable topology (CCD path/mode arrays as base64 via MemoryMarshal) PLUS a
                              per-physical-monitor MonitorState list (res/refresh/pos/primary/devicePath) for
-                             faithful revert + crash recovery. SaveToDisk/LoadFromDisk/DeleteFromDisk.
+                             faithful revert + crash recovery. SaveToDisk()/SaveToDisk(path) + LoadFromDisk
+                             overloads (StatePath for crash recovery; NonVr/Vr layout paths for presets).
 
   Detection/
     VdSignals.cs             IsStreamerRunning ("VirtualDesktop.Streamer"), MmfExists, TryEventPulse
@@ -148,7 +156,10 @@ src/VirtualMirage/
     StatusIcons.cs           AppStatus enum (Idle/Disabled/Connected/Active/Error) -> the logo badged
                              with a status-colored dot (StatusIcons.For, via IconArt).
     SettingsForm.cs          Settings dialog over Config (+ Autostart): resolution, refresh, detection
-                             mode/debounce, startup, "Check for updates on launch".
+                             mode/debounce, startup, "Check for updates on launch". Plus two "Save current
+                             as Non-VR / VR layout" buttons (below Disable-others) wired via Func<bool>
+                             callbacks to DisplayManager.SaveLayoutSnapshot (enabled only when
+                             DisableOtherMonitors is unchecked).
     UpdateForm.cs            Persistent (modeless) "Updates" window opened from the tray update item, so a
                              manual check stays visible after the menu closes. Show* state methods +
                              PrimaryActionRequested; driven by UpdateController. --selftest-updateform.

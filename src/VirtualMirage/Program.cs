@@ -235,7 +235,9 @@ internal static class Program
             try
             {
                 settingsOpen = true;
-                using var form = new SettingsForm(cfg);
+                using var form = new SettingsForm(cfg,
+                    saveNonVrLayout: () => new DisplayManager().SaveLayoutSnapshot(cfg.MonitorGuid, Paths.NonVrLayoutPath),
+                    saveVrLayout: () => new DisplayManager().SaveLayoutSnapshot(cfg.MonitorGuid, Paths.VrLayoutPath));
                 form.ShowDialog();
             }
             catch (Exception ex) { Log.Error("settings dialog failed", ex); }
